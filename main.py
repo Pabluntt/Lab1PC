@@ -1,3 +1,8 @@
+import math
+import re
+from collections import Counter, defaultdict
+from typing import List, Dict, Tuple
+
 #son algunas nomas, ya que podemos ampliar esto de ser necesario xd
 stopwords = {
     'de','la','que','el','en','y','a','los','del','se','las','por','un','para',
