@@ -8,7 +8,6 @@ stopwords = {
 }
 
 def normalizar_texto(texto: str) -> str:
-    """Pasa a minúsculas, elimina tildes y caracteres no alfanuméricos (excluye espacios)."""
     texto = texto.lower()
     # quitamos tildes y signos
     reemplazos = {
@@ -31,5 +30,4 @@ def remover_stopwords(tokens: List[str]) -> List[str]:
     return [t for t in tokens if t not in stopwords and len(t) > 1]
 
 def preprocesamiento(texto: str) -> List[str]:
-    """Pipeline completo: normalizar -> tokenizar -> quitar stopwords"""
     return remover_stopwords(tokenizar(normalizar_texto(texto)))
