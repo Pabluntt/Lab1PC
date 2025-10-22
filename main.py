@@ -59,3 +59,27 @@ def calcular_idf(corpus_tokens: List[List[str]]) -> Dict[str, float]:
 def vector_tfidf(tokens: List[str], idf: Dict[str, float]) -> Dict[str, float]:
     tf = calcular_tf(tokens)
     return {t: tf_val * idf.get(t, 0.0) for t, tf_val in tf.items()}
+
+# Calcula el módulo de un vector
+def _l2(v: Dict[str, float]) -> float:
+    return math.sqrt(sum(val * val for val in v.values()))
+
+#Calcula  el producto punto entre 2 vectores
+def _dot(v1: Dict[str, float], v2: Dict[str, float]) -> float:
+    if len(v1) > len(v2):
+        v1, v2 = v2, v1
+    return sum(val * v2.get(term, 0.0) for term, val in v1.items())
+
+# Calcula la similitud de coseno entre 2 vectores de los textos, utilizando el producto punto y los modulos
+def similitud_coseno(vec1: Dict[str, float], vec2: Dict[str, float]) -> float:
+    num = _dot(vec1, vec2)
+    den = _l2(vec1) * _l2(vec2)
+    return num / den if den else 0.0
+
+#Calcula la similitud de coseno entre 2 textos, preprocesandolos y calculando los vectores TF-IDF
+def similitud_coseno_textos(t1: str, t2: str, idf: Dict[str, float]) -> float:
+    tokens1 = preprocesamiento(t1)
+    tokens2 = preprocesamiento(t2)
+    vec1 = vector_tfidf(tokens1, idf)
+    vec2 = vector_tfidf(tokens2, idf)
+    return similitud_coseno(vec1, vec2)
