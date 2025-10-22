@@ -83,3 +83,31 @@ def similitud_coseno_textos(t1: str, t2: str, idf: Dict[str, float]) -> float:
     vec1 = vector_tfidf(tokens1, idf)
     vec2 = vector_tfidf(tokens2, idf)
     return similitud_coseno(vec1, vec2)
+
+
+
+opcion = 0
+while opcion != 5:
+    print("""
+          1.- Entrenar el modelo con los datos del data set
+          2.- Cargar el modelo previamente entrenado
+          3.- Guardar el nuevo modelo entrenado
+          4.- Predecir la categoria de un texto con el modelo entrenado
+          5.- Salir
+            """)
+    try:
+        opcion = int(input("Seleccione una opción (1-5): ").strip())
+    except ValueError:
+        print("Opción inválida, ingrese un número entre 1 y 5.")
+        continue
+
+    if (opcion==1):
+        print(f"Soy la opion {opcion}")
+    elif (opcion==2):
+        print(f"Soy la opion {opcion}")
+
+    elif (opcion==3):
+        print(f"Soy la opion {opcion}")
+
+    elif(opcion==4):
+        print(f"Soy la opion {opcion}")
