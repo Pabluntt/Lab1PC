@@ -96,3 +96,78 @@ def similitud_coseno_textos(t1: str, t2: str, idf: Dict[str, float]) -> float:
     vec1 = vector_tfidf(tokens1, idf)
     vec2 = vector_tfidf(tokens2, idf)
     return similitud_coseno(vec1, vec2)
+
+def calcular_tfidf_por_subcategoria(dataset_dir: str = "dataset", min_df: int = 1):
+    """
+    Recorre cada subcarpeta de dataset_dir y calcula:
+      - un TfidfVectorizer entrenado con los documentos de la subcategoria
+      - la matriz TF-IDF de los documentos
+      - la ruta de cada documento
+      - un vector centroid (promedio) TF-IDF para la subcategoria (dict token->valor)
+
+    Devuelve un dict con estructura:
+      { categoria: { "vectorizer": vec, "matrix": mat, "paths": [..], "centroid": {token: val, ...} }, ... }
+    """
+    import os
+    import glob
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    try:
+        from scipy.sparse import issparse
+    except Exception:
+        # Fallback when scipy is not available: detect common sparse matrix attributes/methods
+        def issparse(x):
+            return any(hasattr(x, attr) for attr in ("tocoo", "tocsr", "tocsc", "tolil", "getnnz"))
+    results = {}
+
+    if not os.path.isdir(dataset_dir):
+        return results
+
+    for categoria in sorted(os.listdir(dataset_dir)):
+        cat_path = os.path.join(dataset_dir, categoria)
+        if not os.path.isdir(cat_path):
+            continue
+
+        # leer todos los .txt de la subcarpeta
+        paths = sorted(glob.glob(os.path.join(cat_path, "*.txt")))
+        textos = []
+        for p in paths:
+            try:
+                with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                    textos.append(f.read())
+            except Exception:
+                textos.append("")
+
+        # preprocesar usando la función existente
+        procesados = [" ".join(preprocesamiento(t)) for t in textos]
+
+        if not any(procesados):
+            # si no hay texto procesable, guardar vacío y continuar
+            results[categoria] = {"vectorizer": None, "matrix": None, "paths": paths, "centroid": {}}
+            continue
+
+        # vectorizar la subcategoria
+        vec = TfidfVectorizer(lowercase=False, token_pattern=r"(?u)\b\w+\b", min_df=min_df)
+        mat = vec.fit_transform(procesados)
+
+        # calcular centroid (promedio columnar). mat puede ser sparse.
+        if hasattr(mat, "mean"):
+            centroid_row = mat.mean(axis=0)
+            if issparse(centroid_row):
+                centroid_arr = centroid_row.A1
+            else:
+                centroid_arr = centroid_row.flatten().tolist()[0] if hasattr(centroid_row, "flatten") else centroid_row
+        else:
+            # fallback: convertir a array
+            centroid_arr = mat.toarray().mean(axis=0)
+
+        features = vec.get_feature_names_out()
+        centroid = {features[i]: float(centroid_arr[i]) for i in range(len(features)) if centroid_arr[i] != 0.0}
+
+        results[categoria] = {
+            "vectorizer": vec,
+            "matrix": mat,
+            "paths": paths,
+            "centroid": centroid
+        }
+
+    return results
