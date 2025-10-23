@@ -1,10 +1,10 @@
 #import extraccion_dataset
-import math
-import re
+import math as math
+import re as re
 from collections import Counter, defaultdict
 from typing import List, Dict, Tuple
 import funciones as fn
-import textos_propios
+import textos_propios as txtp
 
 # Los textos propios fueron creados a base de IA, y en inglés para poder ser consistentes con el dataset y realizar una correcta comparación.
 
