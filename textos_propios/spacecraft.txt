@@ -1,0 +1,3 @@
+The spacecraft entered a stable orbit around Mars after a series of trajectory correction maneuvers. Mission control monitored telemetry for 
+signs of fuel consumption and thermal stability. The scientific payload includes a spectrometer and a high-resolution camera to study the Martian 
+surface. Engineers planned a small delta-v burn to adjust periapsis for better imaging. Data will be relayed through a deep space network antenna.

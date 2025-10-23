@@ -1,0 +1,4 @@
+Modern computer graphics relies on the GPU to accelerate the rendering pipeline. Techniques like rasterization, anti-aliasing, 
+and shader programs are common in OpenGL and DirectX. Ray tracing produces realistic reflections and global illumination but can be 
+computationally expensive. Texture mapping and mipmaps help with performance and image quality. Many engines also use post-processing effects 
+like bloom and tone mapping.
