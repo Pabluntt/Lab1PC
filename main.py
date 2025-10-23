@@ -3,7 +3,7 @@ import math
 import re
 from collections import Counter, defaultdict
 from typing import List, Dict, Tuple
-import funciones
+import funciones as fn
 import textos_propios
 
 # Los textos propios fueron creados a base de IA, y en inglés para poder ser consistentes con el dataset y realizar una correcta comparación.
@@ -25,7 +25,7 @@ while opcion != 5:
 
     if (opcion==1):
         print(f"Soy la opcion {opcion}")
-        resultados = calcular_tfidf_por_subcategoria()
+        resultados = fn.calcular_tfidf_por_subcategoria()
         print(resultados["sci.space"])
     elif (opcion==2):
         print(f"Soy la opcion {opcion}")
