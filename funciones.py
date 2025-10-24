@@ -1,6 +1,7 @@
 import extraccion_dataset
 import math
 import re
+import json
 from collections import Counter, defaultdict
 from typing import List, Dict, Tuple
 
@@ -171,3 +172,35 @@ def calcular_tfidf_por_subcategoria(dataset_dir: str = "dataset", min_df: int = 
         }
 
     return results
+
+def guardar_modelo_txt(model_dict: dict, filepath: str = "datos.txt"):
+    """
+    Guarda una versión serializable del modelo por subcategoría en 'filepath'.
+    model_dict es el resultado de calcular_tfidf_por_subcategoria().
+    Se escribe por categoría: centroid (token->valor), paths (lista de archivos), n_docs.
+    """
+    serial = {}
+    for categoria, info in (model_dict or {}).items():
+        centroid = info.get("centroid", {}) or {}
+        paths = info.get("paths", []) or []
+        serial[categoria] = {
+            "centroid": centroid,
+            "paths": paths,
+            "n_docs": len(paths)
+        }
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(serial, f, ensure_ascii=False, indent=2)
+    return filepath
+
+def cargar_modelo_txt(filepath: str = "datos.txt"):
+    """
+    Carga el JSON guardado por guardar_modelo_txt y devuelve el dict.
+    """
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        return {}
