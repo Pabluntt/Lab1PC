@@ -39,7 +39,7 @@ while opcion != 5:
         if modelo_cargado:
             print("Modelo cargado. Resumen por categoría:")
             for cat, info in modelo_cargado.items():
-                print(f"{cat}: n_docs={info.get('n_docs',0)} tokens_centroid={len(info.get('centroid',{}))}")
+                print(f"{cat}: n_docs={info.get('n_docs',0)} tokens_idf={len(info.get('idf',{}))}")
         else:
             print("No se encontró o no se pudo cargar 'datos.txt'.")
 
@@ -51,4 +51,38 @@ while opcion != 5:
             print(f"Modelo guardado en {ruta}")
 
     elif(opcion==4):
-        print(f"Soy la opion {opcion}")
+        # Predicción por similitud: pedir texto y comparar contra documentos por categoría
+        if modelo_entrenado is None and modelo_cargado is None:
+            print("No hay modelo en memoria ni cargado desde 'datos.txt'. Ejecute opción 1 o 2 primero.")
+            continue
+
+        print("Pegue el texto a predecir (termine con una línea que contenga solo 'EOF'):")
+        lines = []
+        while True:
+            try:
+                line = input()
+            except EOFError:
+                break
+            if line.strip() == "EOF":
+                break
+            lines.append(line)
+        query_text = "\n".join(lines).strip()
+        if not query_text:
+            print("Texto vacío. Abortando predicción.")
+            continue
+
+        # elegir modelo a usar (preferir el entrenado en memoria)
+        model_to_use = modelo_entrenado if modelo_entrenado is not None else modelo_cargado
+
+        # llamar a la función en funciones.py
+        top_results = fn.predict_category_from_model(query_text, model_to_use, top_k=5)
+        if not top_results:
+            print("No se pudo obtener predicciones (modelo vacío o texto no procesable).")
+            continue
+
+        # imprimir categoría predicha (top1) y el top-k
+        top1_cat, top1_score = top_results[0]
+        print(f"Categoría predicha: {top1_cat} (similitud={top1_score:.4f})")
+        print("Top categorías (categoria, similitud):")
+        for cat, score in top_results:
+            print(f"{cat}\t{score:.4f}")

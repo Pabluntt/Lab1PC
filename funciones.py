@@ -100,26 +100,17 @@ def similitud_coseno_textos(t1: str, t2: str, idf: Dict[str, float]) -> float:
 
 def calcular_tfidf_por_subcategoria(dataset_dir: str = "dataset", min_df: int = 1):
     """
-    Recorre cada subcarpeta de dataset_dir y calcula:
-      - un TfidfVectorizer entrenado con los documentos de la subcategoria
-      - la matriz TF-IDF de los documentos
-      - la ruta de cada documento
-      - un vector centroid (promedio) TF-IDF para la subcategoria (dict token->valor)
+    Recorre cada subcarpeta de dataset_dir y calcula manualmente:
+      - idf: mapping token -> idf_value (calculado por conteo de documentos)
+      - paths: lista de archivos
+      - matrix: lista de dicts (tf-idf por documento) -> cada elemento es {token: tfidf_val, ...}
 
-    Devuelve un dict con estructura:
-      { categoria: { "vectorizer": vec, "matrix": mat, "paths": [..], "centroid": {token: val, ...} }, ... }
+    No usa sklearn: lee archivos con open(), preprocesa y cuenta.
     """
     import os
     import glob
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    try:
-        from scipy.sparse import issparse
-    except Exception:
-        # Fallback when scipy is not available: detect common sparse matrix attributes/methods
-        def issparse(x):
-            return any(hasattr(x, attr) for attr in ("tocoo", "tocsr", "tocsc", "tolil", "getnnz"))
-    results = {}
 
+    results = {}
     if not os.path.isdir(dataset_dir):
         return results
 
@@ -128,47 +119,41 @@ def calcular_tfidf_por_subcategoria(dataset_dir: str = "dataset", min_df: int = 
         if not os.path.isdir(cat_path):
             continue
 
-        # leer todos los .txt de la subcarpeta
         paths = sorted(glob.glob(os.path.join(cat_path, "*.txt")))
-        textos = []
+        corpus_tokens = []  # lista de listas de tokens por documento
+        textos_raw = []
+
         for p in paths:
             try:
                 with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                    textos.append(f.read())
+                    txt = f.read()
             except Exception:
-                textos.append("")
+                txt = ""
+            textos_raw.append(txt)
+            corpus_tokens.append(preprocesamiento(txt))
 
-        # preprocesar usando la función existente
-        procesados = [" ".join(preprocesamiento(t)) for t in textos]
-
-        if not any(procesados):
-            # si no hay texto procesable, guardar vacío y continuar
-            results[categoria] = {"vectorizer": None, "matrix": None, "paths": paths, "centroid": {}}
+        # filtrar documentos vacíos
+        non_empty = [toks for toks in corpus_tokens if toks]
+        if not non_empty:
+            results[categoria] = {"vectorizer": None, "matrix": [], "paths": paths, "idf": {}}
             continue
 
-        # vectorizar la subcategoria
-        vec = TfidfVectorizer(lowercase=False, token_pattern=r"(?u)\b\w+\b", min_df=min_df)
-        mat = vec.fit_transform(procesados)
+        # calcular idf usando la función existente (conteo de documentos donde aparece el término)
+        idf_map = calcular_idf(corpus_tokens)
 
-        # calcular centroid (promedio columnar). mat puede ser sparse.
-        if hasattr(mat, "mean"):
-            centroid_row = mat.mean(axis=0)
-            if issparse(centroid_row):
-                centroid_arr = centroid_row.A1
-            else:
-                centroid_arr = centroid_row.flatten().tolist()[0] if hasattr(centroid_row, "flatten") else centroid_row
-        else:
-            # fallback: convertir a array
-            centroid_arr = mat.toarray().mean(axis=0)
-
-        features = vec.get_feature_names_out()
-        centroid = {features[i]: float(centroid_arr[i]) for i in range(len(features)) if centroid_arr[i] != 0.0}
+        # calcular tf-idf por documento (lista de dicts)
+        tfidf_docs = []
+        for toks in corpus_tokens:
+            if not toks:
+                tfidf_docs.append({})
+                continue
+            tfidf_docs.append(vector_tfidf(toks, idf_map))
 
         results[categoria] = {
-            "vectorizer": vec,
-            "matrix": mat,
+            "vectorizer": None,
+            "matrix": tfidf_docs,   # lista de dicts tf-idf por documento
             "paths": paths,
-            "centroid": centroid
+            "idf": idf_map
         }
 
     return results
@@ -176,15 +161,32 @@ def calcular_tfidf_por_subcategoria(dataset_dir: str = "dataset", min_df: int = 
 def guardar_modelo_txt(model_dict: dict, filepath: str = "datos.txt"):
     """
     Guarda una versión serializable del modelo por subcategoría en 'filepath'.
-    model_dict es el resultado de calcular_tfidf_por_subcategoria().
-    Se escribe por categoría: centroid (token->valor), paths (lista de archivos), n_docs.
+    Ahora solo se almacena por categoría:
+      - idf: mapping token -> idf_value
+      - paths: lista de archivos
+      - n_docs: número de documentos
+
+    No se guardan centroides ni objetos complejos.
     """
     serial = {}
     for categoria, info in (model_dict or {}).items():
-        centroid = info.get("centroid", {}) or {}
+        # preferir idf ya calculado; si no existe, obtenerlo desde el vectorizer
+        idf_map = info.get("idf")
+        if not idf_map:
+            vec = info.get("vectorizer")
+            if vec is not None:
+                feats = vec.get_feature_names_out()
+                idf_values = getattr(vec, "idf_", None)
+                if idf_values is not None:
+                    idf_map = {feats[i]: float(idf_values[i]) for i in range(len(feats))}
+                else:
+                    idf_map = {}
+            else:
+                idf_map = {}
+
         paths = info.get("paths", []) or []
         serial[categoria] = {
-            "centroid": centroid,
+            "idf": idf_map,
             "paths": paths,
             "n_docs": len(paths)
         }
@@ -192,15 +194,69 @@ def guardar_modelo_txt(model_dict: dict, filepath: str = "datos.txt"):
         json.dump(serial, f, ensure_ascii=False, indent=2)
     return filepath
 
-def cargar_modelo_txt(filepath: str = "datos.txt"):
+def cargar_modelo_txt(filepath: str = "datos.txt") -> dict:
     """
-    Carga el JSON guardado por guardar_modelo_txt y devuelve el dict.
+    Lee el JSON guardado en 'filepath' y lo devuelve como dict.
+    Estructura esperada por categoría:
+      { "idf": {token: idf_val, ...}, "paths": [...], "n_docs": N }
     """
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
+        # garantizar formato mínimo
+        if not isinstance(data, dict):
+            return {}
         return data
     except FileNotFoundError:
         return {}
     except Exception:
         return {}
+
+def predict_category_from_model(query_text: str, model_dict: dict, top_k: int = 5):
+    """
+    Dado un texto y un modelo (resultado de calcular_tfidf_por_subcategoria() o el dict cargado desde datos.txt),
+    devuelve una lista (categoria, similitud_max) ordenada descendentemente (top_k).
+    Si el modelo no contiene 'matrix' para una categoría, lee los archivos listados en 'paths' y calcula
+    los TF-IDF por documento usando el 'idf' guardado.
+    """
+    if not query_text or not model_dict:
+        return []
+
+    q_tokens = preprocesamiento(query_text)
+    if not q_tokens:
+        return []
+
+    results = []
+    for cat, info in model_dict.items():
+        idf_map = info.get("idf", {}) or {}
+        matrix = info.get("matrix")  # puede ser lista de dicts TF-IDF por doc o None
+        paths = info.get("paths", []) or []
+
+        # si no hay matriz en memoria, construirla leyendo archivos (si hay paths)
+        docs_tfidf = []
+        if matrix:
+            docs_tfidf = matrix
+        else:
+            for p in paths:
+                try:
+                    with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                        txt = f.read()
+                except Exception:
+                    txt = ""
+                toks = preprocesamiento(txt)
+                docs_tfidf.append(vector_tfidf(toks, idf_map) if toks else {})
+
+        # vector de la consulta usando el idf de la categoría
+        query_vec = vector_tfidf(q_tokens, idf_map)
+        best_sim = 0.0
+        for doc_vec in docs_tfidf:
+            if not doc_vec:
+                continue
+            sim = similitud_coseno(query_vec, doc_vec)
+            if sim > best_sim:
+                best_sim = sim
+
+        results.append((cat, best_sim))
+
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results[:top_k]
