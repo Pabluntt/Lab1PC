@@ -4,6 +4,7 @@ import re
 import json
 from collections import Counter, defaultdict
 from typing import List, Dict, Tuple
+from collections import Counter
 
 #son algunas nomas, ya que podemos ampliar esto de ser necesario xd
 # Se incluyen también en inglés ya que los textos estan en inglés
@@ -214,25 +215,35 @@ def cargar_modelo_txt(filepath: str = "datos.txt") -> dict:
 
 def predict_category_from_model(query_text: str, model_dict: dict, top_k: int = 5):
     """
-    Dado un texto y un modelo (resultado de calcular_tfidf_por_subcategoria() o el dict cargado desde datos.txt),
-    devuelve una lista (categoria, similitud_max) ordenada descendentemente (top_k).
-    Si el modelo no contiene 'matrix' para una categoría, lee los archivos listados en 'paths' y calcula
-    los TF-IDF por documento usando el 'idf' guardado.
+    Dado un texto de consulta y un modelo TF-IDF por subcategoría,
+    calcula la categoría predicha aplicando los 5 pasos del procedimiento:
+    
+    1. Preprocesa la consulta y calcula su vector TF-IDF.
+    2. Calcula la similitud de coseno entre la consulta y todos los documentos del modelo.
+    3. Ordena los documentos por similitud descendente.
+    4. Selecciona los K documentos más similares.
+    5. Aplica una votación mayoritaria entre las categorías de los K vecinos.
+    
+    Retorna:
+      (categoria_predicha, vecinos)
+      donde vecinos es una lista [(categoria, path, similitud)] ordenada por similitud.
     """
     if not query_text or not model_dict:
-        return []
+        return None, []
 
     q_tokens = preprocesamiento(query_text)
     if not q_tokens:
-        return []
+        return None, []
 
-    results = []
+    # Lista global de todos los documentos comparados
+    all_docs = []  # [(categoria, path, similitud)]
+
     for cat, info in model_dict.items():
         idf_map = info.get("idf", {}) or {}
-        matrix = info.get("matrix")  # puede ser lista de dicts TF-IDF por doc o None
         paths = info.get("paths", []) or []
+        matrix = info.get("matrix")
 
-        # si no hay matriz en memoria, construirla leyendo archivos (si hay paths)
+        # Construir los vectores TF-IDF de cada documento (si no hay en memoria)
         docs_tfidf = []
         if matrix:
             docs_tfidf = matrix
@@ -246,17 +257,30 @@ def predict_category_from_model(query_text: str, model_dict: dict, top_k: int = 
                 toks = preprocesamiento(txt)
                 docs_tfidf.append(vector_tfidf(toks, idf_map) if toks else {})
 
-        # vector de la consulta usando el idf de la categoría
+        # Calcular vector de la consulta (usando el IDF de la categoría)
         query_vec = vector_tfidf(q_tokens, idf_map)
-        best_sim = 0.0
-        for doc_vec in docs_tfidf:
+
+        # Calcular similitud con cada documento
+        for i, doc_vec in enumerate(docs_tfidf):
             if not doc_vec:
                 continue
             sim = similitud_coseno(query_vec, doc_vec)
-            if sim > best_sim:
-                best_sim = sim
+            doc_path = paths[i] if i < len(paths) else f"{cat}_doc{i}"
+            all_docs.append((cat, doc_path, sim))
 
-        results.append((cat, best_sim))
+    # Si no hay documentos válidos
+    if not all_docs:
+        return None, []
 
-    results.sort(key=lambda x: x[1], reverse=True)
-    return results[:top_k]
+    # Ordenar por similitud descendente
+    all_docs.sort(key=lambda x: x[2], reverse=True)
+
+    # Seleccionar los K documentos más similares
+    vecinos = all_docs[:top_k]
+
+    # Votación mayoritaria
+    categorias = [c for c, _, _ in vecinos]
+    conteo = Counter(categorias)
+    categoria_predicha = conteo.most_common(1)[0][0]
+
+    return categoria_predicha, vecinos

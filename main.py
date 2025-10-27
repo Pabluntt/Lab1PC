@@ -75,14 +75,12 @@ while opcion != 5:
         model_to_use = modelo_entrenado if modelo_entrenado is not None else modelo_cargado
 
         # llamar a la función en funciones.py
-        top_results = fn.predict_category_from_model(query_text, model_to_use, top_k=5)
-        if not top_results:
+        categoria_predicha, vecinos = fn.predict_category_from_model(query_text, model_to_use, top_k=5)
+        if not vecinos:
             print("No se pudo obtener predicciones (modelo vacío o texto no procesable).")
             continue
 
-        # imprimir categoría predicha (top1) y el top-k
-        top1_cat, top1_score = top_results[0]
-        print(f"Categoría predicha: {top1_cat} (similitud={top1_score:.4f})")
-        print("Top categorías (categoria, similitud):")
-        for cat, score in top_results:
-            print(f"{cat}\t{score:.4f}")
+        print(f"\nCategoría predicha: {categoria_predicha}")
+        print("\nTop documentos más similares:")
+        for cat, path, sim in vecinos:
+            print(f"- {cat}\t(similitud={sim:.4f})\t→ {path}")
