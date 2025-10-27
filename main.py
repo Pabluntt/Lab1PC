@@ -15,10 +15,10 @@ modelo_cargado = None     # dict cargado desde datos.txt
 
 while opcion != 5:
     print("""
-          1.- Entrenar el modelo con los datos del data set
-          2.- Cargar el modelo previamente entrenado
-          3.- Guardar el nuevo modelo entrenado
-          4.- Predecir la categoria de un texto con el modelo entrenado
+          1.- Calcular TF-IDF con los datos del data set
+          2.- Cargar los TF-IDF previamente cargados
+          3.- Guardar los TF-IDF calculados
+          4.- Calcular similitud del coseno de un texto con el resto de textos
           5.- Salir
             """)
     try:
@@ -28,13 +28,13 @@ while opcion != 5:
         continue
 
     if (opcion==1):
-        print("Entrenando modelo (calculando TF-IDF por subcategoría)...")
+        print("Calculando TF-IDF por subcategoría...")
         modelo_entrenado = fn.calcular_tfidf_por_subcategoria("dataset")
         total = sum(len(info.get("paths", [])) for info in modelo_entrenado.values()) if modelo_entrenado else 0
         print(f"Entrenamiento completado. Categorías: {len(modelo_entrenado)}. Documentos totales: {total}")
 
     elif (opcion==2):
-        print("Cargando modelo desde 'datos.txt'...")
+        print("Cargando TF-IDF desde 'datos.txt'...")
         modelo_cargado = fn.cargar_modelo_txt("datos.txt")
         if modelo_cargado:
             print("Modelo cargado. Resumen por categoría:")
@@ -53,7 +53,7 @@ while opcion != 5:
     elif(opcion==4):
         # Predicción por similitud: pedir texto y comparar contra documentos por categoría
         if modelo_entrenado is None and modelo_cargado is None:
-            print("No hay modelo en memoria ni cargado desde 'datos.txt'. Ejecute opción 1 o 2 primero.")
+            print("No hay TF-IDF en memoria ni cargado desde 'datos.txt'. Ejecute opción 1 o 2 primero.")
             continue
 
         print("Pegue el texto a predecir (termine con una línea que contenga solo 'EOF'):")
@@ -71,7 +71,7 @@ while opcion != 5:
             print("Texto vacío. Abortando predicción.")
             continue
 
-        # elegir modelo a usar (preferir el entrenado en memoria)
+        # elegir modelo a usar (Usa el que esta en memoria por preferencia)
         model_to_use = modelo_entrenado if modelo_entrenado is not None else modelo_cargado
 
         # llamar a la función en funciones.py

@@ -65,10 +65,13 @@ def calcular_tf(tokens: List[str]) -> Dict[str, float]:
 # Calcula el IDF de cada término
 def calcular_idf(corpus_tokens: List[List[str]]) -> Dict[str, float]:
     N = len(corpus_tokens)
-    df = Counter()
+    # Conteo manual: por cada documento, considerar términos únicos y aumentar su document frequency en 1
+    df = {}  # tipo: Dict[str, int]
     for tokens in corpus_tokens:
-        df.update(set(tokens))
-    return {t: math.log((N + 1) / (df_t + 1)) + 1 for t, df_t in df.items()}
+        for term in set(tokens):
+            df[term] = df.get(term, 0) + 1
+
+    return {t: math.log((N) / (df_t + 1)) for t, df_t in df.items()}
 
 # Calcula el vector, recibiendo los tokens y el diccionario con los IDF
 def vector_tfidf(tokens: List[str], idf: Dict[str, float]) -> Dict[str, float]:
@@ -100,14 +103,12 @@ def similitud_coseno_textos(t1: str, t2: str, idf: Dict[str, float]) -> float:
     return similitud_coseno(vec1, vec2)
 
 def calcular_tfidf_por_subcategoria(dataset_dir: str = "dataset", min_df: int = 1):
-    """
-    Recorre cada subcarpeta de dataset_dir y calcula manualmente:
-      - idf: mapping token -> idf_value (calculado por conteo de documentos)
-      - paths: lista de archivos
-      - matrix: lista de dicts (tf-idf por documento) -> cada elemento es {token: tfidf_val, ...}
-
-    No usa sklearn: lee archivos con open(), preprocesa y cuenta.
-    """
+    
+    #Recorre cada subcarpeta de dataset_dir y calcula manualmente:
+    #  - idf: mapping token -> idf_value (calculado por conteo de documentos)
+    #  - paths: lista de archivos
+    #  - matrix: lista de dicts (tf-idf por documento) -> cada elemento es {token: tfidf_val, ...}
+    
     import os
     import glob
 
@@ -160,15 +161,13 @@ def calcular_tfidf_por_subcategoria(dataset_dir: str = "dataset", min_df: int = 
     return results
 
 def guardar_modelo_txt(model_dict: dict, filepath: str = "datos.txt"):
-    """
-    Guarda una versión serializable del modelo por subcategoría en 'filepath'.
-    Ahora solo se almacena por categoría:
-      - idf: mapping token -> idf_value
-      - paths: lista de archivos
-      - n_docs: número de documentos
+    
+    #Guarda una versión serializable del modelo por subcategoría en 'filepath'.
+    #Ahora solo se almacena por categoría:
+    #  - idf: mapping token -> idf_value
+    #  - paths: lista de archivos
+    #  - n_docs: número de documentos
 
-    No se guardan centroides ni objetos complejos.
-    """
     serial = {}
     for categoria, info in (model_dict or {}).items():
         # preferir idf ya calculado; si no existe, obtenerlo desde el vectorizer
@@ -196,11 +195,11 @@ def guardar_modelo_txt(model_dict: dict, filepath: str = "datos.txt"):
     return filepath
 
 def cargar_modelo_txt(filepath: str = "datos.txt") -> dict:
-    """
-    Lee el JSON guardado en 'filepath' y lo devuelve como dict.
-    Estructura esperada por categoría:
-      { "idf": {token: idf_val, ...}, "paths": [...], "n_docs": N }
-    """
+    
+    #Lee el JSON guardado en 'filepath' y lo devuelve como dict.
+    #Estructura esperada por categoría:
+    #  { "idf": {token: idf_val, ...}, "paths": [...], "n_docs": N }
+    
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -214,20 +213,20 @@ def cargar_modelo_txt(filepath: str = "datos.txt") -> dict:
         return {}
 
 def predict_category_from_model(query_text: str, model_dict: dict, top_k: int = 5):
-    """
-    Dado un texto de consulta y un modelo TF-IDF por subcategoría,
-    calcula la categoría predicha aplicando los 5 pasos del procedimiento:
     
-    1. Preprocesa la consulta y calcula su vector TF-IDF.
-    2. Calcula la similitud de coseno entre la consulta y todos los documentos del modelo.
-    3. Ordena los documentos por similitud descendente.
-    4. Selecciona los K documentos más similares.
-    5. Aplica una votación mayoritaria entre las categorías de los K vecinos.
+    #Dado un texto de consulta y un modelo TF-IDF por subcategoría,
+    #calcula la categoría predicha aplicando los 5 pasos del procedimiento:
     
-    Retorna:
-      (categoria_predicha, vecinos)
-      donde vecinos es una lista [(categoria, path, similitud)] ordenada por similitud.
-    """
+    #1. Preprocesa la consulta y calcula su vector TF-IDF.
+    #2. Calcula la similitud de coseno entre la consulta y todos los documentos del modelo.
+    #3. Ordena los documentos por similitud descendente.
+    #4. Selecciona los K documentos más similares.
+    #5. Aplica una votación mayoritaria entre las categorías de los K vecinos.
+    
+    #Retorna:
+    #  (categoria_predicha, vecinos)
+    #  donde vecinos es una lista [(categoria, path, similitud)] ordenada por similitud.
+    
     if not query_text or not model_dict:
         return None, []
 
