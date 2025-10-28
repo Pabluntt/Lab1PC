@@ -1,4 +1,4 @@
-import extraccion_dataset
+#import extraccion_dataset
 import math
 import re
 import json
@@ -6,7 +6,7 @@ from collections import Counter, defaultdict
 from typing import List, Dict, Tuple
 from collections import Counter
 
-#son algunas nomas, ya que podemos ampliar esto de ser necesario xd
+# Algunas Stopwords
 # Se incluyen también en inglés ya que los textos estan en inglés
 stopwords = {
     'de','la','que','el','en','y','a','los','del','se','las','por','un','para',
