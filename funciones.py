@@ -209,7 +209,7 @@ def cargar_modelo_txt(filepath: str = "datos.txt") -> dict:
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
-        # garantizar formato mínimo
+        
         if not isinstance(data, dict):
             return {}
 
