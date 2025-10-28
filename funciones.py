@@ -130,7 +130,7 @@ def calcular_tfidf_por_subcategoria(dataset_dir: str = "dataset", min_df: int = 
                 with open(p, "r", encoding="utf-8", errors="ignore") as f:
                     txt = f.read()
             except Exception:
-                txt = ""
+                    txt = ""
             textos_raw.append(txt)
             corpus_tokens.append(preprocesamiento(txt))
 
@@ -163,31 +163,37 @@ def calcular_tfidf_por_subcategoria(dataset_dir: str = "dataset", min_df: int = 
 def guardar_modelo_txt(model_dict: dict, filepath: str = "datos.txt"):
     
     #Guarda una versión serializable del modelo por subcategoría en 'filepath'.
-    #Ahora solo se almacena por categoría:
+    #Ahora se almacena por categoría:
     #  - idf: mapping token -> idf_value
     #  - paths: lista de archivos
-    #  - n_docs: número de documentos
+    #  - matrix: lista de dicts (tf-idf por documento) -> cada elemento es {token: tfidf_val, ...}
 
     serial = {}
     for categoria, info in (model_dict or {}).items():
-        # preferir idf ya calculado; si no existe, obtenerlo desde el vectorizer
-        idf_map = info.get("idf")
-        if not idf_map:
-            vec = info.get("vectorizer")
-            if vec is not None:
-                feats = vec.get_feature_names_out()
-                idf_values = getattr(vec, "idf_", None)
-                if idf_values is not None:
-                    idf_map = {feats[i]: float(idf_values[i]) for i in range(len(feats))}
-                else:
-                    idf_map = {}
-            else:
-                idf_map = {}
+        # obtener idf si existe, y normalizar a floats
+        idf_map = info.get("idf") or {}
+        idf_serial = {str(k): float(v) for k, v in idf_map.items()} if isinstance(idf_map, dict) else {}
 
         paths = info.get("paths", []) or []
+
+        # Preferir "matrix" si ya está disponible (lista de dicts tf-idf por documento)
+        matrix = info.get("matrix")
+        serial_matrix = []
+        if isinstance(matrix, list):
+            for vec in matrix:
+                if not isinstance(vec, dict):
+                    serial_matrix.append({})
+                    continue
+                # asegurar floats y claves string
+                serial_matrix.append({str(k): float(v) for k, v in vec.items()})
+        else:
+            # Si no hay 'matrix' en memoria, intentar reconstruir desde archivos (no forzaremos lectura aquí)
+            serial_matrix = []
+
         serial[categoria] = {
-            "idf": idf_map,
-            "paths": paths,
+            "idf": idf_serial,
+            "paths": list(paths),
+            "matrix": serial_matrix,
             "n_docs": len(paths)
         }
     with open(filepath, "w", encoding="utf-8") as f:
@@ -197,8 +203,8 @@ def guardar_modelo_txt(model_dict: dict, filepath: str = "datos.txt"):
 def cargar_modelo_txt(filepath: str = "datos.txt") -> dict:
     
     #Lee el JSON guardado en 'filepath' y lo devuelve como dict.
-    #Estructura esperada por categoría:
-    #  { "idf": {token: idf_val, ...}, "paths": [...], "n_docs": N }
+    #Estructura devuelta por categoría:
+    #  { "idf": {token: idf_val, ...}, "paths": [...], "matrix": [ {token: tfidf_val, ...}, ... ], "n_docs": N }
     
     try:
         with open(filepath, "r", encoding="utf-8") as f:
@@ -206,7 +212,46 @@ def cargar_modelo_txt(filepath: str = "datos.txt") -> dict:
         # garantizar formato mínimo
         if not isinstance(data, dict):
             return {}
-        return data
+
+        normalized = {}
+        for categoria, info in data.items():
+            if not isinstance(info, dict):
+                continue
+            idf = info.get("idf") or {}
+            if isinstance(idf, dict):
+                idf = {str(k): float(v) for k, v in idf.items()}
+            else:
+                idf = {}
+
+            paths = info.get("paths", []) or []
+            if not isinstance(paths, list):
+                paths = []
+
+            matrix = info.get("matrix") or []
+            normalized_matrix = []
+            if isinstance(matrix, list):
+                for vec in matrix:
+                    if not isinstance(vec, dict):
+                        normalized_matrix.append({})
+                        continue
+                    normalized_matrix.append({str(k): float(v) for k, v in vec.items()})
+            else:
+                normalized_matrix = []
+
+            n_docs = info.get("n_docs")
+            try:
+                n_docs = int(n_docs) if n_docs is not None else len(paths)
+            except Exception:
+                n_docs = len(paths)
+
+            normalized[categoria] = {
+                "idf": idf,
+                "paths": paths,
+                "matrix": normalized_matrix,
+                "n_docs": n_docs
+            }
+
+        return normalized
     except FileNotFoundError:
         return {}
     except Exception:

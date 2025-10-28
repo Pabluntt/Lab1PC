@@ -1,14 +1,16 @@
-#import extraccion_dataset
 import math as math
 import re as re
 from collections import Counter, defaultdict
 from typing import List, Dict, Tuple
 import funciones as fn
 import textos_propios as txtp
+#import extraccion_dataset
+# Desdocumentar si se requieren mas datos para el data set 
+
 
 # Los textos propios fueron creados a base de IA, y en inglés para poder ser consistentes con el dataset y realizar una correcta comparación.
 
-opcion = 0
+opcion = 6
 # variables para modelos en memoria
 modelo_entrenado = None   # dict devuelto por funciones.calcular_tfidf_por_subcategoria()
 modelo_cargado = None     # dict cargado desde datos.txt
@@ -26,17 +28,22 @@ while opcion != 5:
     except ValueError:
         print("Opción inválida, ingrese un número entre 1 y 5.")
         continue
-
+    
     if (opcion==1):
         print("Calculando TF-IDF por subcategoría...")
         modelo_entrenado = fn.calcular_tfidf_por_subcategoria("dataset")
         total = sum(len(info.get("paths", [])) for info in modelo_entrenado.values()) if modelo_entrenado else 0
         print(f"Entrenamiento completado. Categorías: {len(modelo_entrenado)}. Documentos totales: {total}")
+        # Si se entrenó correctamente, reflejar ese modelo también como 'modelo_cargado'
+        if modelo_entrenado:
+            modelo_cargado = modelo_entrenado
 
     elif (opcion==2):
         print("Cargando TF-IDF desde 'datos.txt'...")
         modelo_cargado = fn.cargar_modelo_txt("datos.txt")
         if modelo_cargado:
+            # Si se cargó correctamente, reflejar ese modelo también como 'modelo_entrenado'
+            modelo_entrenado = modelo_cargado
             print("Modelo cargado. Resumen por categoría:")
             for cat, info in modelo_cargado.items():
                 print(f"{cat}: n_docs={info.get('n_docs',0)} tokens_idf={len(info.get('idf',{}))}")
